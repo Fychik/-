@@ -11,14 +11,18 @@
         #map { width: 100vw; height: 100vh; }
         .leaflet-popup-content { max-width: 350px; font-size: 14px; line-height: 1.5; }
         .leaflet-popup-content b { color: #333; }
+        .leaflet-control-title {
+            background: rgba(0,0,0,0.7); color: white; padding: 8px 15px; border-radius: 5px;
+            font-size: 18px; font-weight: bold; pointer-events: none;
+        }
         .legend {
             background: rgba(255, 255, 255, 0.92); padding: 12px 15px; border-radius: 6px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.2); line-height: 1.6; font-size: 14px; max-width: 260px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2); line-height: 1.6; font-size: 14px; max-width: 280px;
         }
         .legend i { width: 14px; height: 14px; float: left; margin-right: 8px; margin-top: 3px; border-radius: 50%; border: 1px solid #555; }
         .legend .title { font-weight: bold; margin-bottom: 5px; font-size: 15px; }
         @media (max-width: 600px) {
-            .legend { font-size: 12px; padding: 8px 10px; max-width: 200px; }
+            .legend { font-size: 12px; padding: 8px 10px; max-width: 220px; }
         }
     </style>
 </head>
@@ -30,11 +34,18 @@
         attribution: '© OpenStreetMap contributors'
     }).addTo(map);
 
-    // Стили для круглых маркеров — простые объекты
+    // ---------- ЗАГОЛОВОК ----------
+    L.control({position: 'topleft'}).onAdd = function() {
+        const div = L.DomUtil.create('div', 'leaflet-control-title');
+        div.innerHTML = 'Бомбардировки Югославии 1999: операция «Союзная сила»';
+        return div;
+    };
+    L.control({position: 'topleft'}).addTo(map);
+
+    // ---------- СТИЛИ ИКОНОК ----------
     function makeStyle(color, radius = 7) {
         return { radius: radius, color: color, weight: 2, fillColor: color, fillOpacity: 0.9 };
     }
-
     const styles = {
         start: makeStyle('#ff6600', 9),
         bombard: makeStyle('#d9534f'),
@@ -46,20 +57,87 @@
         highlighted: makeStyle('#ffc107', 11)
     };
 
-    // ========== ПОЛНЫЙ МАССИВ СОБЫТИЙ (все 120+) ==========
+    // ---------- ГЕО-СЛОИ ----------
+    // Границы Сербии (СРЮ)
+    const serbiaGeoJSON = {
+        "type": "Feature",
+        "properties": { "name": "СРЮ" },
+        "geometry": {
+            "type": "Polygon",
+            "coordinates": [[[19.6,44.8],[19.6,43.5],[18.5,42.5],[20.3,41.3],[20.6,41.8],[21.7,42.3],[22.2,42.2],[22.8,42.3],[22.9,43.5],[22.9,44.2],[22.5,44.8],[21.2,45.3],[20.3,44.8],[19.6,44.8]]]
+        }
+    };
+    L.geoJSON(serbiaGeoJSON, {
+        style: { color: '#cc0000', weight: 2, fillColor: '#cc0000', fillOpacity: 0.15 }
+    }).addTo(map);
+
+    // Косово внутри Сербии
+    const kosovoGeoJSON = {
+        "type": "Feature",
+        "properties": { "name": "Косово" },
+        "geometry": {
+            "type": "Polygon",
+            "coordinates": [[[20.0,42.9],[20.1,42.2],[21.3,42.1],[21.8,42.5],[21.9,43.3],[21.3,43.5],[20.5,43.3],[20.0,42.9]]]
+        }
+    };
+    L.geoJSON(kosovoGeoJSON, {
+        style: { color: '#e6a800', weight: 2, fillColor: '#ffd633', fillOpacity: 0.35 }
+    }).addTo(map);
+
+    // Страны НАТО
+    const natoCountries = [
+        { name: "Италия", coords: [[7.5,37.5],[7.5,44.0],[13.5,44.0],[13.5,37.5],[7.5,37.5]] },
+        { name: "Венгрия", coords: [[16.0,46.0],[16.0,48.5],[22.8,48.5],[22.8,46.0],[16.0,46.0]] },
+        { name: "Турция", coords: [[26.0,36.0],[26.0,42.0],[44.0,42.0],[44.0,36.0],[26.0,36.0]] }
+    ];
+    natoCountries.forEach(c => {
+        L.geoJSON({
+            type: "Feature",
+            geometry: { type: "Polygon", coordinates: [c.coords] }
+        }, {
+            style: { color: '#2b6cb0', weight: 2, fillColor: '#a0c4ff', fillOpacity: 0.2 }
+        }).addTo(map);
+        L.marker(c.coords[0], { opacity: 0, icon: L.divIcon({ className: '', html: `<div style="background:rgba(43,108,176,0.8);color:white;padding:2px 6px;border-radius:4px;font-size:12px;">${c.name}</div>` }) }).addTo(map);
+    });
+
+    // Авиабазы
+    const bases = [
+        { lat: 45.8, lng: 12.6, name: 'Авиабаза Авиано (Италия)' },
+        { lat: 47.5, lng: 19.0, name: 'Авиабаза Кечкемет (Венгрия)' },
+        { lat: 37.0, lng: 35.4, name: 'Авиабаза Инджирлик (Турция)' }
+    ];
+    bases.forEach(b => {
+        L.circleMarker([b.lat, b.lng], { radius: 5, color: '#2b6cb0', fillColor: '#fff', fillOpacity: 1, weight: 2 })
+            .bindPopup(b.name).addTo(map);
+    });
+
+    // Адриатическое море – зона действия авианосцев
+    const adriaticGeoJSON = {
+        "type": "Feature",
+        "properties": { "name": "Адриатика" },
+        "geometry": {
+            "type": "Polygon",
+            "coordinates": [[[12.0,41.0],[12.0,45.0],[19.0,45.0],[19.0,41.0],[12.0,41.0]]]
+        }
+    };
+    L.geoJSON(adriaticGeoJSON, {
+        style: { color: '#2b6cb0', weight: 2, fillColor: '#a0c4ff', fillOpacity: 0.25, dashArray: '4 4' }
+    }).addTo(map);
+
+    // Германия (метка авиабазы)
+    L.marker([49.0, 8.0], {
+        icon: L.divIcon({ className: '', html: '<div style="font-size:18px;">✈️</div>', iconSize: [18,18], iconAnchor: [9,9] })
+    }).bindPopup('Авиабаза Рамштайн (Германия)').addTo(map);
+
+    // ---------- ПОЛНЫЙ МАССИВ СОБЫТИЙ (БЕРЁМ ИЗ ПРЕДЫДУЩЕЙ ВЕРСИИ) ----------
     const eventsData = [
-        // 24 марта — 8 точек
+        // 24 марта
         {
             id: 'start1', date: '24.03.1999', place: 'Начало бомбардировок', cat: 'start',
             coords: [
-                [44.8131, 20.4344], // Белград
-                [42.6629, 21.1655], // Приштина
-                [45.2667, 19.8333], // Нови-Сад
-                [43.9988, 20.9111], // Крагуевац
-                [44.8732, 20.6405], // Панчево
-                [42.4411, 19.2636], // Подгорица
-                [43.3247, 21.8953], // Ниш
-                [43.8586, 19.8431]  // Ужице
+                [44.8131, 20.4344], [42.6629, 21.1655], [45.2667, 19.8333],
+                [43.9988, 20.9111], [44.8732, 20.6405], [42.4411, 19.2636],
+                [43.3247, 21.8953], [43.8586, 19.8431]
             ],
             desc: 'Вечером 24 марта 1999 года силы НАТО нанесли удары по 53 целям на территории Югославии, начав операцию «Союзная сила». В первый день атаке подверглись объекты ПВО, командные пункты и военная инфраструктура; бомбардировки продолжались 78 дней.'
         },
@@ -208,14 +286,13 @@
         { id: 'bo76', date: '21.05.1999', place: 'Бомбардировка тюрьмы в Истоке (повторная атака)', cat: 'bombard', coords: [[42.76139, 20.52944]], desc: 'НАТО нанесло повторный удар по тюрьме Дубрава в Истоке; по некоторым данным, погибло не менее 100 заключенных.' }
     ];
 
-    // Группировка по категориям
+    // Группировка и отрисовка событий
     const layers = {};
     eventsData.forEach(e => {
         if (!layers[e.cat]) layers[e.cat] = [];
         e.coords.forEach(coord => {
             const marker = L.circleMarker(coord, styles[e.cat])
                 .bindPopup(`<b>${e.date}</b><br><b>${e.place}</b><br>${e.desc}`);
-            // Для групповых событий — подсветка при клике
             if (e.coords.length > 1) {
                 marker.on('click', function() {
                     layers[e.cat].forEach(m => {
@@ -228,7 +305,7 @@
         });
     });
 
-    // Все слои видны при старте, галочки в легенде активны
+    // Добавляем все слои событий на карту и в контрол
     const overlayMaps = {};
     for (const [cat, markers] of Object.entries(layers)) {
         const group = L.layerGroup(markers);
@@ -241,7 +318,12 @@
     const legend = L.control({ position: 'bottomright' });
     legend.onAdd = function() {
         const div = L.DomUtil.create('div', 'legend');
-        div.innerHTML = '<div class="title">Категории</div>' +
+        div.innerHTML = '<div class="title">Обозначения</div>' +
+            '<i style="background:#cc0000; opacity:0.6;"></i> Сербия и Черногория (СРЮ)<br>' +
+            '<i style="background:#ffd633; opacity:0.8;"></i> Автономный край Косово<br>' +
+            '<i style="background:#a0c4ff; opacity:0.6; border-color:#2b6cb0;"></i> Страны НАТО<br>' +
+            '<i style="background:#a0c4ff; opacity:0.25; border:2px dashed #2b6cb0;"></i> Акватория Адриатического моря (пуски крылатых ракет с кораблей НАТО)<br>' +
+            '✈️ Авиабазы<br>' +
             '<i style="background:#ff6600; transform:rotate(45deg); display:inline-block;"></i> Начало бомбардировок<br>' +
             '<i style="background:#d9534f"></i> Бомбардировки<br>' +
             '<i style="background:#8B4513"></i> Мосты<br>' +
